@@ -2,7 +2,11 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#030712">
 <title>Train Track Editor</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -20,19 +24,31 @@
     --warn-bg: rgba(251, 191, 36, 0.16);
     --danger: #ef4444;
   }
-  html, body { width: 100%; height: 100%; overflow: hidden; }
+  html, body { width: 100%; height: 100%; overflow: hidden; overscroll-behavior: none; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
     color: var(--text);
     background: var(--bg-2);
     user-select: none;
     -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
   }
-  #app { position: relative; width: 100vw; height: 100vh; }
-  canvas { display: block; cursor: crosshair; }
-  #canvas3d-container { position: absolute; inset: 0; display: none; }
-  #canvas3d-container canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+  #app {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  canvas { display: block; cursor: crosshair; touch-action: none; }
+  #canvas3d-container { position: absolute; inset: 0; display: none; touch-action: none; }
+  #canvas3d-container canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
   #canvas3d-container.dragging canvas { cursor: grabbing; }
+  button { -webkit-tap-highlight-color: transparent; }
 
   .panel {
     background: var(--panel);
@@ -227,6 +243,141 @@
   body.view-3d .toolbar,
   body.view-3d .badge,
   body.view-3d .train-menu { display: none !important; }
+
+  /* Hint can be collapsed via a chevron button on small screens */
+  .hint-toggle {
+    display: none;
+    position: absolute; top: 18px; right: 18px;
+    width: 38px; height: 38px;
+    background: var(--panel);
+    backdrop-filter: blur(22px) saturate(140%);
+    -webkit-backdrop-filter: blur(22px) saturate(140%);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255,255,255,0.06);
+    align-items: center; justify-content: center;
+    color: var(--text-dim); cursor: pointer;
+    z-index: 6;
+  }
+  .hint-toggle svg { width: 18px; height: 18px; stroke-width: 2; fill: none; stroke: currentColor; }
+
+  /* ===== Tablet & smaller ===== */
+  @media (max-width: 900px) {
+    .view-btn .btn-label,
+    .tool-btn .btn-label,
+    .icon-btn .btn-label,
+    .tool-btn .key {
+      display: none;
+    }
+    .view-btn, .tool-btn { padding: 8px 10px; gap: 0; }
+    .icon-btn { padding: 7px 9px; }
+    .speed-control > span { display: none; }
+    input[type=range] { width: 100px; }
+  }
+
+  /* ===== Phone ===== */
+  @media (max-width: 640px) {
+    .view-toggle {
+      top: max(8px, env(safe-area-inset-top));
+      left: max(8px, env(safe-area-inset-left));
+      padding: 3px;
+    }
+    .view-btn { padding: 8px 10px; font-size: 11px; }
+    .view-btn svg { width: 16px; height: 16px; }
+
+    /* Move the tool palette to just above the bottom controls so the top edge
+       stays clear for view-toggle (left) + hint-toggle (right), avoiding overlap
+       on narrow phones. */
+    .toolbar {
+      top: auto;
+      bottom: calc(max(12px, env(safe-area-inset-bottom)) + 66px);
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 4px;
+      gap: 1px;
+    }
+    .tool-btn { padding: 9px 9px; }
+    .tool-btn svg { width: 18px; height: 18px; }
+
+    .hint { display: none; }
+    .hint-toggle {
+      display: flex;
+      top: max(8px, env(safe-area-inset-top));
+      right: max(8px, env(safe-area-inset-right));
+    }
+    body.hint-open .hint {
+      display: block;
+      top: calc(max(8px, env(safe-area-inset-top)) + 48px);
+      right: max(8px, env(safe-area-inset-right));
+      max-width: calc(100vw - 24px);
+      font-size: 12px;
+      padding: 10px 12px;
+      z-index: 6;
+    }
+    body.view-3d .hint-toggle,
+    body.view-3d.hint-open .hint { /* still useful in 3d/fps */ }
+
+    .controls {
+      bottom: max(12px, env(safe-area-inset-bottom));
+      gap: 8px;
+      padding: 6px 10px;
+      max-width: calc(100vw - 16px);
+      flex-wrap: nowrap;
+    }
+    .play-btn { width: 38px; height: 38px; }
+    .play-btn svg { width: 16px; height: 16px; }
+    .speed-control { gap: 6px; }
+    input[type=range] { width: 90px; }
+    .icon-btn { padding: 8px; }
+    .icon-btn svg { width: 15px; height: 15px; }
+    .divider { height: 18px; }
+
+    .stats {
+      bottom: auto;
+      top: calc(max(8px, env(safe-area-inset-top)) + 48px);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      padding: 4px 8px;
+      opacity: 0.7;
+      white-space: nowrap;
+    }
+
+    .badge { font-size: 14px; letter-spacing: 0.25em; padding: 0 24px; text-align: center; }
+
+    .train-menu { min-width: 200px; padding: 12px; }
+    .round-btn { width: 30px; height: 30px; font-size: 16px; }
+    .delete-btn { padding: 10px; }
+
+    /* Larger hit target via inflated padding on small tap-friendly buttons */
+    .view-btn, .tool-btn, .icon-btn, .play-btn, .round-btn, .delete-btn { min-height: 36px; }
+  }
+
+  /* ===== Very small phones (narrow) ===== */
+  @media (max-width: 420px) {
+    .controls { gap: 6px; padding: 5px 8px; }
+    input[type=range] { width: 80px; }
+    .stats { display: none; }
+    .toolbar { padding: 3px; gap: 0; }
+    .tool-btn { padding: 8px; }
+    .view-btn { padding: 7px 8px; }
+    #resetViewBtn { padding: 8px; }
+  }
+
+  /* Landscape phone: keep panels small and out of the way. The tall vertical
+     space is gone, so put the toolbar at the top again. */
+  @media (max-height: 480px) and (orientation: landscape) {
+    .toolbar {
+      top: 6px;
+      bottom: auto;
+      padding: 3px;
+    }
+    .view-toggle { top: 6px; left: 6px; padding: 3px; }
+    .hint-toggle { top: 6px; right: 6px; width: 34px; height: 34px; }
+    .controls { bottom: 6px; padding: 5px 8px; }
+    .stats { top: auto; bottom: 50px; left: 6px; right: auto; transform: none; }
+    .play-btn { width: 34px; height: 34px; }
+  }
 </style>
 <script type="importmap">
 {
@@ -242,43 +393,43 @@
   <canvas id="canvas"></canvas>
   <div id="canvas3d-container"></div>
 
-  <div class="badge" id="emptyBadge">Click to start drawing</div>
+  <div class="badge" id="emptyBadge">Tap to start drawing</div>
 
   <div class="panel view-toggle">
-    <button class="view-btn active" data-view="2d">
+    <button class="view-btn active" data-view="2d" title="2D view">
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v18"/></svg>
-      2D
+      <span class="btn-label">2D</span>
     </button>
-    <button class="view-btn" data-view="3d">
+    <button class="view-btn" data-view="3d" title="3D view">
       <svg viewBox="0 0 24 24"><path d="M12 2l9 5v10l-9 5-9-5V7l9-5z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>
-      3D
+      <span class="btn-label">3D</span>
     </button>
     <button class="view-btn" data-view="fps" title="Ride the train (cab view)">
       <svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
-      FPS
+      <span class="btn-label">FPS</span>
     </button>
   </div>
 
   <div class="panel toolbar">
     <button class="tool-btn active" data-tool="track" title="Track tool (1)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M3 16C7 6 17 6 21 16"/></svg>
-      Track <span class="key">1</span>
+      <span class="btn-label">Track</span> <span class="key">1</span>
     </button>
     <button class="tool-btn" data-tool="move" title="Move tool (2)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M4 12h16M9 7l3-3 3 3M9 17l3 3 3-3M7 9l-3 3 3 3M17 9l3 3-3 3"/></svg>
-      Move <span class="key">2</span>
+      <span class="btn-label">Move</span> <span class="key">2</span>
     </button>
     <button class="tool-btn" data-tool="train" title="Train tool (3)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="14" height="9" rx="2"/><circle cx="8" cy="18" r="1.6"/><circle cx="14" cy="18" r="1.6"/><path d="M18 9l3 3-3 3"/></svg>
-      Train <span class="key">3</span>
+      <span class="btn-label">Train</span> <span class="key">3</span>
     </button>
     <button class="tool-btn" data-tool="switch" title="Switch tool (4)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h6c2 0 3-1 4-3l5-9h3"/><path d="M3 18h6c2 0 3 1 4 3h2"/><path d="M19 3l3 3-3 3"/></svg>
-      Switch <span class="key">4</span>
+      <span class="btn-label">Switch</span> <span class="key">4</span>
     </button>
     <button class="tool-btn" data-tool="erase" title="Erase tool (5)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1.2 14.2A1.5 1.5 0 0 1 16.3 22H7.7a1.5 1.5 0 0 1-1.5-1.4L5 6"/></svg>
-      Erase <span class="key">5</span>
+      <span class="btn-label">Erase</span> <span class="key">5</span>
     </button>
   </div>
 
@@ -293,13 +444,17 @@
     <div class="divider"></div>
     <button class="icon-btn" id="resetViewBtn" title="Reset view">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg>
-      Reset view
+      <span class="btn-label">Reset view</span>
     </button>
-    <button class="icon-btn" id="clearBtn">
+    <button class="icon-btn" id="clearBtn" title="Clear all">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
-      Clear all
+      <span class="btn-label">Clear all</span>
     </button>
   </div>
+
+  <button class="hint-toggle" id="hintToggle" title="Show tip" aria-label="Show tip">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg>
+  </button>
 
   <div class="panel hint" id="hint">
     <div class="title">Track tool</div>
@@ -364,7 +519,10 @@ const nodes = new Map();
 const edges = new Map();
 const trains = [];
 
-const SNAP_PX = 18;
+// Touch input is coarse — give snap/pick a bigger radius on touch devices so
+// tap targets are finger-sized rather than mouse-cursor sized.
+const IS_TOUCH = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window);
+const SNAP_PX = IS_TOUCH ? 28 : 18;
 const WAGON_FIRST = 33;
 const WAGON_GAP = 30;
 const MAX_WAGONS = 12;
@@ -844,6 +1002,20 @@ function updateHint() {
   hintEl.querySelector('.body').innerHTML = h.body;
 }
 
+// Hint toggle (mobile collapsed hint panel)
+const hintToggle = document.getElementById('hintToggle');
+if (hintToggle) {
+  hintToggle.addEventListener('click', () => {
+    document.body.classList.toggle('hint-open');
+  });
+  // Tapping outside the hint closes it
+  document.addEventListener('pointerdown', (e) => {
+    if (!document.body.classList.contains('hint-open')) return;
+    if (hintEl.contains(e.target) || hintToggle.contains(e.target)) return;
+    document.body.classList.remove('hint-open');
+  }, true);
+}
+
 document.querySelectorAll('.tool-btn').forEach(btn => {
   btn.addEventListener('click', () => setTool(btn.dataset.tool));
 });
@@ -925,12 +1097,17 @@ function positionTrainMenu() {
   trainMenu.style.display = 'block';
   const rect = trainMenu.getBoundingClientRect();
   const mw = rect.width || 220, mh = rect.height || 140;
+  // Reserve space for the bottom UI (toolbar + controls on phones, just controls on desktop).
+  const isPhone = window.matchMedia('(max-width: 640px)').matches;
+  const bottomReserve = isPhone ? 140 : 80;
+  const topReserve = isPhone ? 80 : 12;
   let x = trainMenuAnchor.x + 24;
   let y = trainMenuAnchor.y - mh / 2;
   if (x + mw > W - 12) x = trainMenuAnchor.x - 24 - mw;
   if (x < 12) x = 12;
-  if (y < 12) y = 12;
-  if (y + mh > H - 12) y = H - 12 - mh;
+  if (y < topReserve) y = topReserve;
+  if (y + mh > H - bottomReserve) y = H - bottomReserve - mh;
+  if (y < topReserve) y = topReserve; // re-clamp if menu is taller than free vertical space
   trainMenu.style.left = x + 'px';
   trainMenu.style.top = y + 'px';
 }
@@ -1023,7 +1200,7 @@ canvas.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return;
 
   const snapWorld = SNAP_PX / view.scale;
-  const trainPickDist = 18 / view.scale;
+  const trainPickDist = (IS_TOUCH ? 28 : 18) / view.scale;
 
   if (tool !== 'erase') {
     const t = pickTrain(mouseWorld.x, mouseWorld.y, trainPickDist);
@@ -1097,7 +1274,7 @@ canvas.addEventListener('mousemove', (e) => {
     return;
   }
   const snapWorld = SNAP_PX / view.scale;
-  const trainPickDist = 18 / view.scale;
+  const trainPickDist = (IS_TOUCH ? 28 : 18) / view.scale;
   hoverNodeId = null; hoverEdgeInfo = null; hoverHandle = null; hoverTrain = null;
   if (tool !== 'erase') hoverTrain = pickTrain(mouseWorld.x, mouseWorld.y, trainPickDist);
   if (!hoverTrain) {
@@ -1140,6 +1317,144 @@ canvas.addEventListener('wheel', (e) => {
   view.x = mouseScreen.x - (mouseScreen.x - view.x) * actualFactor;
   view.y = mouseScreen.y - (mouseScreen.y - view.y) * actualFactor;
   view.scale = newScale;
+}, { passive: false });
+
+// ---------- Touch (2D) ----------
+// Single-finger = tap / drag, mirrors left-click behavior.
+// Two fingers   = pinch-zoom + pan.
+const touch = { mode: 'none', startX: 0, startY: 0, lastX: 0, lastY: 0, startTime: 0, moved: false, pinchDist: 0, pinchCx: 0, pinchCy: 0, startScale: 1, vx0: 0, vy0: 0 };
+const TAP_MOVE_THRESHOLD_PX = 8;
+
+function touchScreenPoint(t) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+}
+
+function syntheticMouse(t, button) {
+  const p = touchScreenPoint(t);
+  return { clientX: t.clientX, clientY: t.clientY, button: button || 0, preventDefault() {}, _localX: p.x, _localY: p.y };
+}
+
+canvas.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    const p = touchScreenPoint(t);
+    touch.mode = 'one';
+    touch.startX = touch.lastX = p.x;
+    touch.startY = touch.lastY = p.y;
+    touch.startTime = performance.now();
+    touch.moved = false;
+    mouseScreen.x = p.x; mouseScreen.y = p.y;
+    mouseWorld = s2w(p.x, p.y);
+    mouseInside = true;
+    // Defer the mousedown-equivalent until we know it's a tap (not a pan); for the
+    // 'move' tool we still want immediate drag so handles/nodes can be grabbed.
+    if (tool === 'move') {
+      // Treat as mousedown immediately so handles/nodes can be dragged
+      const ev = { clientX: t.clientX, clientY: t.clientY, button: 0 };
+      canvas.dispatchEvent(new MouseEvent('mousedown', ev));
+    }
+  } else if (e.touches.length === 2) {
+    // Switch to pinch mode; cancel any in-progress one-finger gesture/drag.
+    if (dragging) dragging = null;
+    if (panning) panning = null;
+    touch.mode = 'pinch';
+    const a = touchScreenPoint(e.touches[0]);
+    const b = touchScreenPoint(e.touches[1]);
+    touch.pinchDist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    touch.pinchCx = (a.x + b.x) / 2;
+    touch.pinchCy = (a.y + b.y) / 2;
+    touch.startScale = view.scale;
+    touch.vx0 = view.x;
+    touch.vy0 = view.y;
+  }
+  e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  if (touch.mode === 'one' && e.touches.length === 1) {
+    const t = e.touches[0];
+    const p = touchScreenPoint(t);
+    const dx = p.x - touch.startX, dy = p.y - touch.startY;
+    if (!touch.moved && Math.hypot(dx, dy) > TAP_MOVE_THRESHOLD_PX) touch.moved = true;
+    mouseScreen.x = p.x; mouseScreen.y = p.y;
+    mouseWorld = s2w(p.x, p.y);
+
+    if (tool === 'move') {
+      // mousemove for drag/handle
+      canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: t.clientX, clientY: t.clientY }));
+    } else if (touch.moved) {
+      // For non-move tools, dragging with one finger pans the view.
+      if (!panning) panning = { sx: touch.startX, sy: touch.startY, vx: view.x, vy: view.y };
+      view.x = panning.vx + (p.x - panning.sx);
+      view.y = panning.vy + (p.y - panning.sy);
+    }
+    touch.lastX = p.x; touch.lastY = p.y;
+  } else if (touch.mode === 'pinch' && e.touches.length >= 2) {
+    const a = touchScreenPoint(e.touches[0]);
+    const b = touchScreenPoint(e.touches[1]);
+    const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const cx = (a.x + b.x) / 2;
+    const cy = (a.y + b.y) / 2;
+    const desiredScale = Math.max(0.25, Math.min(4, touch.startScale * (dist / touch.pinchDist)));
+    // Keep pinch center anchored: world point under pinch center stays put while
+    // scale changes, then translate by the pinch center delta.
+    const worldX = (touch.pinchCx - touch.vx0) / touch.startScale;
+    const worldY = (touch.pinchCy - touch.vy0) / touch.startScale;
+    view.scale = desiredScale;
+    view.x = cx - worldX * desiredScale;
+    view.y = cy - worldY * desiredScale;
+  }
+  e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+  if (touch.mode === 'one' && e.touches.length === 0) {
+    if (tool === 'move') {
+      // mouseup to release drag
+      window.dispatchEvent(new MouseEvent('mouseup'));
+    } else if (!touch.moved) {
+      // Treat as a tap: synthesize a left-click mousedown at the start point.
+      const dt = performance.now() - touch.startTime;
+      if (dt < 800) {
+        mouseScreen.x = touch.startX; mouseScreen.y = touch.startY;
+        mouseWorld = s2w(touch.startX, touch.startY);
+        // Build a synthetic event whose clientX/clientY map to the start screen pos.
+        const rect = canvas.getBoundingClientRect();
+        const ev = new MouseEvent('mousedown', {
+          clientX: rect.left + touch.startX,
+          clientY: rect.top + touch.startY,
+          button: 0,
+        });
+        canvas.dispatchEvent(ev);
+        window.dispatchEvent(new MouseEvent('mouseup'));
+      }
+    } else if (panning) {
+      panning = null;
+    }
+    touch.mode = 'none';
+  } else if (touch.mode === 'pinch') {
+    if (e.touches.length === 1) {
+      // One finger remains: continue in pan mode without firing a tap.
+      const t = e.touches[0];
+      const p = touchScreenPoint(t);
+      touch.mode = 'one';
+      touch.startX = touch.lastX = p.x;
+      touch.startY = touch.lastY = p.y;
+      touch.startTime = performance.now();
+      touch.moved = true; // suppress tap
+      panning = { sx: p.x, sy: p.y, vx: view.x, vy: view.y };
+    } else if (e.touches.length === 0) {
+      touch.mode = 'none';
+    }
+  }
+  e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener('touchcancel', () => {
+  if (panning) panning = null;
+  if (dragging) dragging = null;
+  touch.mode = 'none';
 }, { passive: false });
 
 window.addEventListener('keydown', (e) => {
@@ -1810,6 +2125,36 @@ class ThreeDView {
         this.container.classList.remove('dragging');
       }
     });
+    // Touch parallel for FPS cab view (OrbitControls handles its own touch in orbit mode)
+    dom.addEventListener('touchstart', (e) => {
+      if (this.cameraMode === 'fps' && e.touches.length === 1) {
+        const t = e.touches[0];
+        this.fpsDragging = true;
+        this.fpsLastX = t.clientX;
+        this.fpsLastY = t.clientY;
+        this.container.classList.add('dragging');
+        e.preventDefault();
+      }
+    }, { passive: false });
+    dom.addEventListener('touchmove', (e) => {
+      if (this.fpsDragging && e.touches.length >= 1) {
+        const t = e.touches[0];
+        this.fpsYaw -= (t.clientX - this.fpsLastX) * 0.004;
+        this.fpsPitch -= (t.clientY - this.fpsLastY) * 0.004;
+        this.fpsPitch = Math.max(-Math.PI * 0.42, Math.min(Math.PI * 0.42, this.fpsPitch));
+        this.fpsLastX = t.clientX;
+        this.fpsLastY = t.clientY;
+        e.preventDefault();
+      }
+    }, { passive: false });
+    const endFpsTouch = () => {
+      if (this.fpsDragging) {
+        this.fpsDragging = false;
+        this.container.classList.remove('dragging');
+      }
+    };
+    dom.addEventListener('touchend', endFpsTouch);
+    dom.addEventListener('touchcancel', endFpsTouch);
   }
 
   setCameraMode(mode) {
