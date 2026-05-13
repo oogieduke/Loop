@@ -1482,7 +1482,54 @@ function updateCursor() {
 }
 
 // ---------- Simulation ----------
+// ---------- Collision avoidance ----------
+// Each train checks for other trains' body points (head + wagons) close to its
+// own head and in front of its travel direction. If any are within SAFE_DIST,
+// the train yields (does not advance) this frame. Trains never overlap; the
+// "leader" continues, the "follower" brakes. Head-on encounters deadlock both,
+// which is acceptable — the user can switch the route or reverse a train.
+const TRAIN_SAFE_DIST = 26;
+
+function trainBodyPoints(train) {
+  // Head + each wagon centerpoint, for collision-tested positions.
+  const out = [];
+  const head = getTrainPos(train);
+  if (!head) return out;
+  out.push({ x: head.x, y: head.y });
+  for (let i = 0; i < train.wagons; i++) {
+    const d = WAGON_FIRST + i * WAGON_GAP;
+    const wp = sampleTail(train.tail, d);
+    if (wp) out.push({ x: wp.x, y: wp.y });
+  }
+  return out;
+}
+
+function trainShouldYield(train) {
+  const head = getTrainPos(train);
+  if (!head) return false;
+  const fx = Math.cos(head.angle), fy = Math.sin(head.angle);
+  for (const other of trains) {
+    if (other === train) continue;
+    const pts = trainBodyPoints(other);
+    for (const p of pts) {
+      const dx = p.x - head.x, dy = p.y - head.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > TRAIN_SAFE_DIST) continue;
+      // Only yield if the obstacle is in front of (or right next to) us along
+      // our heading. Stuff behind us doesn't matter.
+      const proj = dx * fx + dy * fy;
+      if (proj > -2) { train._yielding = true; return true; }
+    }
+  }
+  return false;
+}
+
 function stepTrain(train, dt) {
+  if (trainShouldYield(train)) {
+    train._yielding = true;
+    return;
+  }
+  train._yielding = false;
   const speedPx = parseFloat(document.getElementById('speed').value);
   train.s += train.dir * speedPx * dt;
   train.wobble = (train.wobble + dt * 8) % (Math.PI * 2);
@@ -1642,34 +1689,47 @@ function drawNode(n, opts) {
 function drawSwitchIndicator(node) {
   const active = activeBranch(node.id);
   if (!active) return;
-  const branch = active.branch;
-  if (!branch._arc) buildArc(branch);
-  // Sample a point ON the branch curve and orient the arrow along the local tangent
-  const sampleS = Math.min(20, branch._arc.total * 0.35);
-  const branchAtFrom = branch.from === node.id;
-  const sParam = branchAtFrom ? sampleS : branch._arc.total - sampleS;
-  const tParam = tFromS(branch, sParam);
-  const p = bezPoint(branch, tParam);
-  let tan = bezTangent(branch, tParam);
-  if (!branchAtFrom) tan = { x: -tan.x, y: -tan.y };
-  const len = 12, w = 5;
-  const tipX = p.x + tan.x * (len / 2);
-  const tipY = p.y + tan.y * (len / 2);
-  const baseX = p.x - tan.x * (len / 2);
-  const baseY = p.y - tan.y * (len / 2);
-  const nx = -tan.y, ny = tan.x;
-  ctx.fillStyle = 'rgba(251,191,36,0.25)';
-  ctx.beginPath();
-  ctx.moveTo(tipX, tipY);
-  ctx.lineTo(baseX + nx * (w + 2), baseY + ny * (w + 2));
-  ctx.lineTo(baseX - nx * (w + 2), baseY - ny * (w + 2));
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#fbbf24'; ctx.strokeStyle = '#92400e'; ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(tipX, tipY);
-  ctx.lineTo(baseX + nx * w, baseY + ny * w);
-  ctx.lineTo(baseX - nx * w, baseY - ny * w);
-  ctx.closePath(); ctx.fill(); ctx.stroke();
+  const activeId = active.branch.id;
+  // Draw an arrow for every branch at this junction; the active one is bright
+  // amber, the inactive ones are dimmed so it's obvious which route trains take.
+  for (const branch of active.junction.branches) {
+    if (!branch._arc) buildArc(branch);
+    const isActive = branch.id === activeId;
+    const sampleS = Math.min(22, branch._arc.total * 0.4);
+    const branchAtFrom = branch.from === node.id;
+    const sParam = branchAtFrom ? sampleS : branch._arc.total - sampleS;
+    const tParam = tFromS(branch, sParam);
+    const p = bezPoint(branch, tParam);
+    let tan = bezTangent(branch, tParam);
+    if (!branchAtFrom) tan = { x: -tan.x, y: -tan.y };
+    const len = isActive ? 16 : 11;
+    const w = isActive ? 6.5 : 4;
+    const tipX = p.x + tan.x * (len / 2);
+    const tipY = p.y + tan.y * (len / 2);
+    const baseX = p.x - tan.x * (len / 2);
+    const baseY = p.y - tan.y * (len / 2);
+    const nx = -tan.y, ny = tan.x;
+    if (isActive) {
+      ctx.fillStyle = 'rgba(251,191,36,0.28)';
+      ctx.beginPath();
+      ctx.moveTo(tipX + tan.x * 2, tipY + tan.y * 2);
+      ctx.lineTo(baseX + nx * (w + 3), baseY + ny * (w + 3));
+      ctx.lineTo(baseX - nx * (w + 3), baseY - ny * (w + 3));
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fbbf24';
+      ctx.strokeStyle = '#92400e';
+      ctx.lineWidth = 1.2;
+    } else {
+      ctx.fillStyle = 'rgba(148,163,184,0.30)';
+      ctx.strokeStyle = 'rgba(148,163,184,0.55)';
+      ctx.lineWidth = 1;
+    }
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(baseX + nx * w, baseY + ny * w);
+    ctx.lineTo(baseX - nx * w, baseY - ny * w);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
 }
 
 function drawHandles(e, highlightWhich) {
@@ -2112,8 +2172,10 @@ class ThreeDView {
     });
     window.addEventListener('mousemove', (e) => {
       if (this.fpsDragging) {
-        this.fpsYaw -= (e.clientX - this.fpsLastX) * 0.004;
-        this.fpsPitch -= (e.clientY - this.fpsLastY) * 0.004;
+        // Drag-to-pan-the-world convention: dragging right moves the view right
+        // (= camera turns left). Dragging down tilts the view up.
+        this.fpsYaw += (e.clientX - this.fpsLastX) * 0.004;
+        this.fpsPitch += (e.clientY - this.fpsLastY) * 0.004;
         this.fpsPitch = Math.max(-Math.PI * 0.42, Math.min(Math.PI * 0.42, this.fpsPitch));
         this.fpsLastX = e.clientX;
         this.fpsLastY = e.clientY;
@@ -2139,8 +2201,8 @@ class ThreeDView {
     dom.addEventListener('touchmove', (e) => {
       if (this.fpsDragging && e.touches.length >= 1) {
         const t = e.touches[0];
-        this.fpsYaw -= (t.clientX - this.fpsLastX) * 0.004;
-        this.fpsPitch -= (t.clientY - this.fpsLastY) * 0.004;
+        this.fpsYaw += (t.clientX - this.fpsLastX) * 0.004;
+        this.fpsPitch += (t.clientY - this.fpsLastY) * 0.004;
         this.fpsPitch = Math.max(-Math.PI * 0.42, Math.min(Math.PI * 0.42, this.fpsPitch));
         this.fpsLastX = t.clientX;
         this.fpsLastY = t.clientY;
@@ -2574,35 +2636,37 @@ class ThreeDView {
     this._initSceneryMaterials();
     const mats = this._sceneryMats;
     const sg = new THREE.Group();
-    const POLE_X = 1.4;      // pole sits BEHIND the sign (so it doesn't poke through)
+    // Pole stands at one END of the sign (along its width Z axis) instead of behind
+    // the face — that way the pole never obscures either side of the panel.
     const POLE_H = 24;
     const SIGN_W = 19, SIGN_H = 10, SIGN_T = 0.6, SIGN_Y = 19;
-    // Concrete base
+    const POLE_Z = -(SIGN_W / 2 + 1.2); // slight gap between pole and sign edge
+    // Concrete base under the pole
     const base = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.7, 0.6, 14), mats.poleMat);
-    base.position.set(POLE_X, 0.3, 0);
+    base.position.set(0, 0.3, POLE_Z);
     base.castShadow = true;
     sg.add(base);
-    // Pole behind the sign panel
+    // Vertical pole at the side of the sign
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.65, POLE_H, 10), mats.poleMat);
-    pole.position.set(POLE_X, POLE_H / 2, 0);
+    pole.position.set(0, POLE_H / 2, POLE_Z);
     pole.castShadow = true;
     sg.add(pole);
     // Top cap
     const cap = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 8), mats.poleMat);
-    cap.position.set(POLE_X, POLE_H + 0.5, 0);
+    cap.position.set(0, POLE_H + 0.5, POLE_Z);
     cap.castShadow = true;
     sg.add(cap);
-    // Sign body in front of the pole
+    // Sign body — pole is on the -Z edge, sign extends in +Z from there
     const body = new THREE.Mesh(new THREE.BoxGeometry(SIGN_T, SIGN_H, SIGN_W), mats.signBlankMat);
     body.position.set(0, SIGN_Y, 0);
     body.castShadow = true;
     body.receiveShadow = true;
     sg.add(body);
-    // Mounting brackets connecting sign back to the pole
-    const bracketLen = POLE_X - 0.3;
+    // Horizontal brackets reaching from pole to the sign's near edge
+    const bracketLen = -POLE_Z - SIGN_W / 2; // gap between pole center and sign edge
     for (const yOff of [-3.5, 3.5]) {
-      const bracket = new THREE.Mesh(new THREE.BoxGeometry(bracketLen, 0.45, 1.2), mats.poleMat);
-      bracket.position.set(0.3 + bracketLen / 2, SIGN_Y + yOff, 0);
+      const bracket = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.45, bracketLen), mats.poleMat);
+      bracket.position.set(0, SIGN_Y + yOff, POLE_Z + bracketLen / 2);
       bracket.castShadow = true;
       sg.add(bracket);
     }
