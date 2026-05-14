@@ -2015,59 +2015,102 @@ function drawNode(n, opts) {
 function drawSwitchIndicator(node) {
   const active = activeBranch(node.id);
   if (!active) return;
-  const activeId = active.branch.id;
-  // Real railway turnouts leave the junction tangent to the stem (smooth
-  // divergence), so the LOCAL tangent of every branch near the node is nearly
-  // identical. To make the arrow actually show which way each branch heads,
-  // we compute the CHORD direction from the junction to a point deep inside
-  // the branch — that captures the divergence the train will follow.
-  for (const branch of active.junction.branches) {
-    if (!branch._arc) buildArc(branch);
-    const isActive = branch.id === activeId;
-    const branchAtFrom = branch.from === node.id;
-    // Look as far down the branch as we reasonably can — but not all the way
-    // to the other endpoint, where the geometry could turn back on itself.
-    const aimS = Math.min(branch._arc.total * 0.7, 90);
-    const aimParam = branchAtFrom ? aimS : branch._arc.total - aimS;
-    const aimT = tFromS(branch, aimParam);
-    const aimP = bezPoint(branch, aimT);
-    let dirX = aimP.x - node.x, dirY = aimP.y - node.y;
-    const dirLen = Math.hypot(dirX, dirY);
-    if (dirLen < 0.5) continue;
-    dirX /= dirLen; dirY /= dirLen;
-    // Position the arrow a small fixed distance from the junction so it sits
-    // visibly on the branch heading outward.
-    const offset = 16;
-    const cx = node.x + dirX * offset;
-    const cy = node.y + dirY * offset;
-    const len = isActive ? 18 : 12;
-    const w = isActive ? 7 : 4.5;
-    const tipX = cx + dirX * (len / 2);
-    const tipY = cy + dirY * (len / 2);
-    const baseX = cx - dirX * (len / 2);
-    const baseY = cy - dirY * (len / 2);
-    const nx = -dirY, ny = dirX;
-    if (isActive) {
-      ctx.fillStyle = 'rgba(251,191,36,0.30)';
-      ctx.beginPath();
-      ctx.moveTo(tipX + dirX * 2, tipY + dirY * 2);
-      ctx.lineTo(baseX + nx * (w + 3), baseY + ny * (w + 3));
-      ctx.lineTo(baseX - nx * (w + 3), baseY - ny * (w + 3));
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#fbbf24';
-      ctx.strokeStyle = '#92400e';
-      ctx.lineWidth = 1.3;
-    } else {
-      ctx.fillStyle = 'rgba(148,163,184,0.30)';
-      ctx.strokeStyle = 'rgba(148,163,184,0.55)';
-      ctx.lineWidth = 1;
-    }
+  const branch = active.branch;
+  if (!branch._arc) buildArc(branch);
+  const branchAtFrom = branch.from === node.id;
+  // Chord direction from junction toward a point deep in the active branch.
+  const aimS = Math.min(branch._arc.total * 0.7, 90);
+  const aimParam = branchAtFrom ? aimS : branch._arc.total - aimS;
+  const aimT = tFromS(branch, aimParam);
+  const aimP = bezPoint(branch, aimT);
+  let dirX = aimP.x - node.x, dirY = aimP.y - node.y;
+  const dirLen = Math.hypot(dirX, dirY);
+  if (dirLen < 0.5) return;
+  dirX /= dirLen; dirY /= dirLen;
+  const nx = -dirY, ny = dirX;
+
+  // Geometry of a chunky road-marking arrow.
+  const arrowLen = 32;
+  const shaftW = 5.5;
+  const headW = 11;
+  const headL = 13;
+  const offset = 24;
+  const cx = node.x + dirX * offset;
+  const cy = node.y + dirY * offset;
+
+  function arrowPath() {
+    const tipX = cx + dirX * (arrowLen / 2);
+    const tipY = cy + dirY * (arrowLen / 2);
+    const backX = cx - dirX * (arrowLen / 2);
+    const backY = cy - dirY * (arrowLen / 2);
+    const shX = tipX - dirX * headL;
+    const shY = tipY - dirY * headL;
     ctx.beginPath();
     ctx.moveTo(tipX, tipY);
-    ctx.lineTo(baseX + nx * w, baseY + ny * w);
-    ctx.lineTo(baseX - nx * w, baseY - ny * w);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.lineTo(shX + nx * headW, shY + ny * headW);
+    ctx.lineTo(shX + nx * shaftW, shY + ny * shaftW);
+    ctx.lineTo(backX + nx * shaftW, backY + ny * shaftW);
+    ctx.lineTo(backX - nx * shaftW, backY - ny * shaftW);
+    ctx.lineTo(shX - nx * shaftW, shY - ny * shaftW);
+    ctx.lineTo(shX - nx * headW, shY - ny * headW);
+    ctx.closePath();
   }
+
+  // 1. Soft ground shadow, offset slightly to suggest the arrow is raised paint.
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+  ctx.shadowBlur = 7;
+  ctx.shadowOffsetX = 1.8;
+  ctx.shadowOffsetY = 2.6;
+  arrowPath();
+  ctx.fillStyle = '#1a1206';
+  ctx.fill();
+  ctx.restore();
+
+  // 2. Main body — gradient across the arrow's short axis to fake a raised
+  //    cylindrical profile lit from one side (the "light" side is +n, the
+  //    "shadow" side is -n).
+  const gradAX = cx + nx * (headW + 2);
+  const gradAY = cy + ny * (headW + 2);
+  const gradBX = cx - nx * (headW + 2);
+  const gradBY = cy - ny * (headW + 2);
+  const grad = ctx.createLinearGradient(gradAX, gradAY, gradBX, gradBY);
+  grad.addColorStop(0.00, '#fde68a');
+  grad.addColorStop(0.38, '#fbbf24');
+  grad.addColorStop(0.72, '#d97706');
+  grad.addColorStop(1.00, '#7c2d12');
+  arrowPath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // 3. Dark outline for crisp edges.
+  arrowPath();
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = 'rgba(28, 16, 4, 0.9)';
+  ctx.stroke();
+
+  // 4. Specular highlight along the +n edge — a thin, lighter inner stroke
+  //    clipped to the arrow shape to suggest a glossy/raised top.
+  ctx.save();
+  arrowPath();
+  ctx.clip();
+  const tipX = cx + dirX * (arrowLen / 2);
+  const tipY = cy + dirY * (arrowLen / 2);
+  const backX = cx - dirX * (arrowLen / 2);
+  const backY = cy - ny * 0 - dirY * (arrowLen / 2);
+  const shX = tipX - dirX * headL;
+  const shY = tipY - dirY * headL;
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);
+  ctx.lineTo(shX + nx * headW, shY + ny * headW);
+  ctx.lineTo(shX + nx * shaftW, shY + ny * shaftW);
+  ctx.lineTo(backX + nx * shaftW, backY + ny * shaftW);
+  ctx.strokeStyle = 'rgba(255, 246, 200, 0.55)';
+  ctx.lineWidth = 1.4;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawHandles(e, highlightWhich) {
