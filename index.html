@@ -244,6 +244,124 @@
   body.view-3d .badge,
   body.view-3d .train-menu { display: none !important; }
 
+  /* ---- Saves menu ---- */
+  .saves-backdrop {
+    position: absolute; inset: 0; z-index: 40;
+    background: rgba(2, 6, 23, 0.55);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    animation: backdropFade 0.16s ease-out;
+  }
+  @keyframes backdropFade { from { opacity: 0; } to { opacity: 1; } }
+  .saves-menu {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 360px; max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 60px);
+    padding: 16px;
+    z-index: 41;
+    display: flex; flex-direction: column;
+    gap: 12px;
+    animation: menuPop 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .saves-header {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .saves-title {
+    color: var(--text); font-weight: 600; font-size: 14px;
+    letter-spacing: 0.02em;
+  }
+  .saves-close {
+    background: transparent; border: none; color: var(--text-dim);
+    width: 28px; height: 28px; border-radius: 6px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.12s;
+  }
+  .saves-close:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+  .saves-close svg { width: 16px; height: 16px; stroke-width: 2; }
+  .saves-new {
+    display: flex; gap: 6px;
+  }
+  .saves-new input {
+    flex: 1; min-width: 0;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.10);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 11px;
+    font-family: inherit; font-size: 13px;
+    outline: none;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .saves-new input:focus { border-color: rgba(96,165,250,0.6); background: rgba(0,0,0,0.35); }
+  .save-primary {
+    background: linear-gradient(135deg, #60a5fa, #3b82f6);
+    border: none; color: white;
+    padding: 0 14px;
+    border-radius: 8px; cursor: pointer;
+    font-family: inherit; font-size: 12px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+    transition: transform 0.1s, box-shadow 0.12s;
+    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
+  }
+  .save-primary:hover { box-shadow: 0 6px 18px rgba(59, 130, 246, 0.5); }
+  .save-primary:active { transform: scale(0.96); }
+  .save-primary svg { width: 14px; height: 14px; stroke-width: 2; }
+  .saves-list {
+    display: flex; flex-direction: column; gap: 6px;
+    overflow-y: auto;
+    max-height: 50vh;
+    margin: 0 -4px; padding: 2px 4px;
+  }
+  .saves-empty {
+    color: var(--text-dim); font-size: 12px; text-align: center;
+    padding: 18px 0; font-style: italic;
+  }
+  .save-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .save-row:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.10); }
+  .save-info {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .save-name {
+    color: var(--text); font-size: 13px; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .save-meta { color: var(--text-dim); font-size: 10.5px; }
+  .save-row-actions { display: flex; gap: 4px; }
+  .save-row-actions button {
+    background: transparent; border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text-dim);
+    padding: 6px 10px; border-radius: 6px; cursor: pointer;
+    font-family: inherit; font-size: 11px; font-weight: 500;
+    transition: all 0.12s;
+    min-height: 30px;
+  }
+  .save-row-actions .load:hover {
+    background: var(--accent-bg); border-color: rgba(96,165,250,0.35); color: var(--accent);
+  }
+  .save-row-actions .del:hover {
+    background: rgba(239,68,68,0.14); border-color: rgba(239,68,68,0.35); color: #fca5a5;
+  }
+  .save-row.confirming .del {
+    background: rgba(239,68,68,0.18); border-color: rgba(239,68,68,0.45); color: #fecaca;
+  }
+
+  @media (max-width: 640px) {
+    .saves-menu { width: calc(100vw - 24px); padding: 14px; }
+    .saves-list { max-height: 55vh; }
+    .save-row { padding: 10px; }
+    .save-row-actions button { padding: 8px 12px; font-size: 12px; }
+  }
+
   /* Hint can be collapsed via a chevron button on small screens */
   .hint-toggle {
     display: none;
@@ -446,10 +564,34 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg>
       <span class="btn-label">Reset view</span>
     </button>
+    <button class="icon-btn" id="savesBtn" title="Saved tracks">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+      <span class="btn-label">Saves</span>
+    </button>
     <button class="icon-btn" id="clearBtn" title="Clear all">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
       <span class="btn-label">Clear all</span>
     </button>
+  </div>
+
+  <div class="saves-backdrop" id="savesBackdrop" style="display:none;"></div>
+  <div class="panel saves-menu" id="savesMenu" style="display:none;">
+    <div class="saves-header">
+      <div class="saves-title">Saved tracks</div>
+      <button class="saves-close" id="savesClose" aria-label="Close" title="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <form class="saves-new" id="savesNewForm" autocomplete="off">
+      <input type="text" id="savesNewName" placeholder="Name this track…" maxlength="40">
+      <button type="submit" class="save-primary" id="savesNewBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+        Save
+      </button>
+    </form>
+    <div class="saves-list" id="savesList">
+      <div class="saves-empty">No saved tracks yet.</div>
+    </div>
   </div>
 
   <button class="hint-toggle" id="hintToggle" title="Show tip" aria-label="Show tip">
@@ -1123,6 +1265,190 @@ reverseBtn.addEventListener('click', (e) => { e.stopPropagation(); if (selectedT
 deleteTrainBtn.addEventListener('click', (e) => { e.stopPropagation(); if (selectedTrain) deleteTrain(selectedTrain); });
 trainMenu.addEventListener('mousedown', (e) => e.stopPropagation());
 
+// ---------- Local saves ----------
+const SAVES_STORAGE_KEY = 'loop.savedTracks';
+const SAVES_MAX = 20;
+
+function loadSavesIndex() {
+  try {
+    const raw = localStorage.getItem(SAVES_STORAGE_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function writeSavesIndex(arr) {
+  try {
+    localStorage.setItem(SAVES_STORAGE_KEY, JSON.stringify(arr));
+  } catch (e) {
+    // Quota exceeded or storage disabled — surface a single console warn, the
+    // user can still manage existing saves.
+    console.warn('Could not write saves to localStorage:', e);
+  }
+}
+
+function serializeWorld() {
+  return {
+    v: 1,
+    nodes: [...nodes.values()].map(n => ({ id: n.id, x: n.x, y: n.y, switchEdge: n.switchEdge })),
+    edges: [...edges.values()].map(e => ({
+      id: e.id, from: e.from, to: e.to,
+      cp1: { x: e.cp1.x, y: e.cp1.y },
+      cp2: { x: e.cp2.x, y: e.cp2.y },
+    })),
+    trains: trains.map(t => ({ edgeId: t.edgeId, s: t.s, dir: t.dir, wagons: t.wagons })),
+    nextId,
+  };
+}
+
+function deserializeWorld(data) {
+  if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.edges)) return false;
+  nodes.clear();
+  edges.clear();
+  trains.length = 0;
+  pendingNodeId = null;
+  if (selectedTrain) hideTrainMenu();
+  for (const n of data.nodes) {
+    nodes.set(n.id, { id: n.id, x: n.x, y: n.y, switchEdge: n.switchEdge ?? null });
+  }
+  for (const e of data.edges) {
+    const edge = {
+      id: e.id, from: e.from, to: e.to,
+      cp1: { x: e.cp1.x, y: e.cp1.y },
+      cp2: { x: e.cp2.x, y: e.cp2.y },
+      _arc: null,
+    };
+    edges.set(e.id, edge);
+    buildArc(edge);
+  }
+  for (const t of (data.trains || [])) {
+    if (!edges.has(t.edgeId)) continue;
+    const train = { edgeId: t.edgeId, s: t.s, dir: t.dir, wagons: t.wagons || 0, tail: [], wobble: 0 };
+    rebuildTail(train);
+    trains.push(train);
+  }
+  let maxId = 0;
+  for (const id of nodes.keys()) if (id > maxId) maxId = id;
+  for (const id of edges.keys()) if (id > maxId) maxId = id;
+  nextId = Math.max(data.nextId || 0, maxId + 1);
+  markTracksDirty();
+  return true;
+}
+
+function formatSaveDate(ts) {
+  const d = new Date(ts);
+  const today = new Date();
+  const isToday = d.toDateString() === today.toDateString();
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (isToday) return 'Today ' + time;
+  return d.toLocaleDateString([], { day: '2-digit', month: 'short' }) + ' ' + time;
+}
+
+const savesBtn = document.getElementById('savesBtn');
+const savesMenu = document.getElementById('savesMenu');
+const savesBackdrop = document.getElementById('savesBackdrop');
+const savesClose = document.getElementById('savesClose');
+const savesList = document.getElementById('savesList');
+const savesNewForm = document.getElementById('savesNewForm');
+const savesNewName = document.getElementById('savesNewName');
+
+function renderSavesList() {
+  const items = loadSavesIndex();
+  savesList.innerHTML = '';
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.className = 'saves-empty';
+    empty.textContent = 'No saved tracks yet.';
+    savesList.appendChild(empty);
+    return;
+  }
+  items.forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.className = 'save-row';
+    const info = document.createElement('div');
+    info.className = 'save-info';
+    const name = document.createElement('div');
+    name.className = 'save-name';
+    name.textContent = item.name || ('Track ' + (idx + 1));
+    const meta = document.createElement('div');
+    meta.className = 'save-meta';
+    const n = (item.data && item.data.nodes) ? item.data.nodes.length : 0;
+    const e = (item.data && item.data.edges) ? item.data.edges.length : 0;
+    meta.textContent = `${formatSaveDate(item.date)} · ${n} pts · ${e} tracks`;
+    info.appendChild(name); info.appendChild(meta);
+    const actions = document.createElement('div');
+    actions.className = 'save-row-actions';
+    const loadBtn = document.createElement('button');
+    loadBtn.type = 'button'; loadBtn.className = 'load'; loadBtn.textContent = 'Load';
+    loadBtn.addEventListener('click', () => {
+      const fresh = loadSavesIndex();
+      if (fresh[idx]) {
+        deserializeWorld(fresh[idx].data);
+        closeSavesMenu();
+      }
+    });
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button'; delBtn.className = 'del'; delBtn.textContent = 'Delete';
+    delBtn.addEventListener('click', () => {
+      if (!row.classList.contains('confirming')) {
+        row.classList.add('confirming');
+        delBtn.textContent = 'Confirm';
+        clearTimeout(delBtn._timer);
+        delBtn._timer = setTimeout(() => {
+          row.classList.remove('confirming');
+          delBtn.textContent = 'Delete';
+        }, 2500);
+        return;
+      }
+      clearTimeout(delBtn._timer);
+      const fresh = loadSavesIndex();
+      fresh.splice(idx, 1);
+      writeSavesIndex(fresh);
+      renderSavesList();
+    });
+    actions.appendChild(loadBtn); actions.appendChild(delBtn);
+    row.appendChild(info); row.appendChild(actions);
+    savesList.appendChild(row);
+  });
+}
+
+function openSavesMenu() {
+  if (selectedTrain) hideTrainMenu();
+  savesMenu.style.display = 'flex';
+  savesBackdrop.style.display = 'block';
+  savesNewName.value = '';
+  renderSavesList();
+  setTimeout(() => savesNewName.focus(), 50);
+}
+function closeSavesMenu() {
+  savesMenu.style.display = 'none';
+  savesBackdrop.style.display = 'none';
+}
+
+savesBtn.addEventListener('click', openSavesMenu);
+savesClose.addEventListener('click', closeSavesMenu);
+savesBackdrop.addEventListener('click', closeSavesMenu);
+savesMenu.addEventListener('mousedown', (e) => e.stopPropagation());
+savesMenu.addEventListener('touchstart', (e) => e.stopPropagation());
+
+savesNewForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const items = loadSavesIndex();
+  const name = (savesNewName.value || '').trim() || ('Track ' + (items.length + 1));
+  items.unshift({ name, date: Date.now(), data: serializeWorld() });
+  if (items.length > SAVES_MAX) items.length = SAVES_MAX;
+  writeSavesIndex(items);
+  savesNewName.value = '';
+  renderSavesList();
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && savesMenu.style.display !== 'none') closeSavesMenu();
+});
+
 // ---------- Switch ----------
 function identifyJunction(nodeId) {
   // Identifies the "stem" edge (where trains arrive to be routed) and the diverging
@@ -1690,35 +2016,47 @@ function drawSwitchIndicator(node) {
   const active = activeBranch(node.id);
   if (!active) return;
   const activeId = active.branch.id;
-  // Draw an arrow for every branch at this junction; the active one is bright
-  // amber, the inactive ones are dimmed so it's obvious which route trains take.
+  // Real railway turnouts leave the junction tangent to the stem (smooth
+  // divergence), so the LOCAL tangent of every branch near the node is nearly
+  // identical. To make the arrow actually show which way each branch heads,
+  // we compute the CHORD direction from the junction to a point deep inside
+  // the branch — that captures the divergence the train will follow.
   for (const branch of active.junction.branches) {
     if (!branch._arc) buildArc(branch);
     const isActive = branch.id === activeId;
-    const sampleS = Math.min(22, branch._arc.total * 0.4);
     const branchAtFrom = branch.from === node.id;
-    const sParam = branchAtFrom ? sampleS : branch._arc.total - sampleS;
-    const tParam = tFromS(branch, sParam);
-    const p = bezPoint(branch, tParam);
-    let tan = bezTangent(branch, tParam);
-    if (!branchAtFrom) tan = { x: -tan.x, y: -tan.y };
-    const len = isActive ? 16 : 11;
-    const w = isActive ? 6.5 : 4;
-    const tipX = p.x + tan.x * (len / 2);
-    const tipY = p.y + tan.y * (len / 2);
-    const baseX = p.x - tan.x * (len / 2);
-    const baseY = p.y - tan.y * (len / 2);
-    const nx = -tan.y, ny = tan.x;
+    // Look as far down the branch as we reasonably can — but not all the way
+    // to the other endpoint, where the geometry could turn back on itself.
+    const aimS = Math.min(branch._arc.total * 0.7, 90);
+    const aimParam = branchAtFrom ? aimS : branch._arc.total - aimS;
+    const aimT = tFromS(branch, aimParam);
+    const aimP = bezPoint(branch, aimT);
+    let dirX = aimP.x - node.x, dirY = aimP.y - node.y;
+    const dirLen = Math.hypot(dirX, dirY);
+    if (dirLen < 0.5) continue;
+    dirX /= dirLen; dirY /= dirLen;
+    // Position the arrow a small fixed distance from the junction so it sits
+    // visibly on the branch heading outward.
+    const offset = 16;
+    const cx = node.x + dirX * offset;
+    const cy = node.y + dirY * offset;
+    const len = isActive ? 18 : 12;
+    const w = isActive ? 7 : 4.5;
+    const tipX = cx + dirX * (len / 2);
+    const tipY = cy + dirY * (len / 2);
+    const baseX = cx - dirX * (len / 2);
+    const baseY = cy - dirY * (len / 2);
+    const nx = -dirY, ny = dirX;
     if (isActive) {
-      ctx.fillStyle = 'rgba(251,191,36,0.28)';
+      ctx.fillStyle = 'rgba(251,191,36,0.30)';
       ctx.beginPath();
-      ctx.moveTo(tipX + tan.x * 2, tipY + tan.y * 2);
+      ctx.moveTo(tipX + dirX * 2, tipY + dirY * 2);
       ctx.lineTo(baseX + nx * (w + 3), baseY + ny * (w + 3));
       ctx.lineTo(baseX - nx * (w + 3), baseY - ny * (w + 3));
       ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#fbbf24';
       ctx.strokeStyle = '#92400e';
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = 1.3;
     } else {
       ctx.fillStyle = 'rgba(148,163,184,0.30)';
       ctx.strokeStyle = 'rgba(148,163,184,0.55)';
@@ -2172,10 +2510,10 @@ class ThreeDView {
     });
     window.addEventListener('mousemove', (e) => {
       if (this.fpsDragging) {
-        // Drag-to-pan-the-world convention: dragging right moves the view right
-        // (= camera turns left). Dragging down tilts the view up.
+        // Horizontal: drag-the-world convention (drag right → view right).
+        // Vertical: drag UP looks UP (drag down → camera tilts down).
         this.fpsYaw += (e.clientX - this.fpsLastX) * 0.004;
-        this.fpsPitch += (e.clientY - this.fpsLastY) * 0.004;
+        this.fpsPitch -= (e.clientY - this.fpsLastY) * 0.004;
         this.fpsPitch = Math.max(-Math.PI * 0.42, Math.min(Math.PI * 0.42, this.fpsPitch));
         this.fpsLastX = e.clientX;
         this.fpsLastY = e.clientY;
@@ -2202,7 +2540,7 @@ class ThreeDView {
       if (this.fpsDragging && e.touches.length >= 1) {
         const t = e.touches[0];
         this.fpsYaw += (t.clientX - this.fpsLastX) * 0.004;
-        this.fpsPitch += (t.clientY - this.fpsLastY) * 0.004;
+        this.fpsPitch -= (t.clientY - this.fpsLastY) * 0.004;
         this.fpsPitch = Math.max(-Math.PI * 0.42, Math.min(Math.PI * 0.42, this.fpsPitch));
         this.fpsLastX = t.clientX;
         this.fpsLastY = t.clientY;
