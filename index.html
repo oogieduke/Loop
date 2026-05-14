@@ -2529,7 +2529,7 @@ class ThreeDView {
 
     this.signpostGroup = new THREE.Group();
     this.scene.add(this.signpostGroup);
-    this.signposts = new Map(); // nodeId -> { group, fp, bp }
+    this.signposts = new Map(); // nodeId -> { mesh }
 
     this.trainGroup = new THREE.Group();
     this.scene.add(this.trainGroup);
@@ -2918,185 +2918,97 @@ class ThreeDView {
     const treeTrunkMat = new THREE.MeshStandardMaterial({ color: 0x4a2f1f, roughness: 0.92 });
     const treeLeafMats = [0x2d6b3a, 0x3a7e44, 0x244e2a, 0x365f30, 0x2a703a].map(c =>
       new THREE.MeshStandardMaterial({ color: c, roughness: 0.85 }));
-    // Signpost materials
-    const poleMat = new THREE.MeshStandardMaterial({ color: 0x2a3140, metalness: 0.7, roughness: 0.35 });
-    const signBlankMat = new THREE.MeshStandardMaterial({ color: 0xece4d2, roughness: 0.7 });
-    const rightArrowTex = this._makeSignTexture('right');
-    const leftArrowTex = this._makeSignTexture('left');
-    const rightArrowMat = new THREE.MeshStandardMaterial({ map: rightArrowTex, roughness: 0.55 });
-    const leftArrowMat = new THREE.MeshStandardMaterial({ map: leftArrowTex, roughness: 0.55 });
+    // Junction ground arrow material — glossy enamel-style amber with a touch
+    // of emissive so it stays readable even in shadow.
+    const arrowMat = new THREE.MeshStandardMaterial({
+      color: 0xf59e0b,
+      emissive: 0xb45309,
+      emissiveIntensity: 0.35,
+      roughness: 0.32,
+      metalness: 0.18,
+    });
     this._sceneryMats = { buildingMats, houseWallMats, houseRoofMat,
       warehouseWallMats, warehouseRoofMat, treeTrunkMat, treeLeafMats,
-      poleMat, signBlankMat, rightArrowMat, leftArrowMat };
+      arrowMat };
   }
 
-  _makeSignTexture(direction) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256; canvas.height = 144;
-    const c = canvas.getContext('2d');
-    // Cream-gradient background
-    const grd = c.createLinearGradient(0, 0, 0, 144);
-    grd.addColorStop(0, '#fbf6e8');
-    grd.addColorStop(1, '#e6dcc3');
-    c.fillStyle = grd;
-    c.fillRect(0, 0, 256, 144);
-    // Outer dark frame
-    c.strokeStyle = '#1a1f2e';
-    c.lineWidth = 4;
-    c.strokeRect(2, 2, 252, 140);
-    // Inner blue border
-    c.strokeStyle = '#2c5282';
-    c.lineWidth = 3;
-    c.strokeRect(11, 11, 234, 122);
-    // Highlight inside the border
-    c.strokeStyle = 'rgba(255,255,255,0.55)';
-    c.lineWidth = 1;
-    c.strokeRect(14, 14, 228, 116);
-    // Arrow (default points to texture's +X / right; mirror for 'left')
-    c.save();
-    c.translate(128, 72);
-    if (direction === 'left') c.scale(-1, 1);
-    // Soft drop shadow
-    c.fillStyle = 'rgba(0,0,0,0.18)';
-    c.beginPath();
-    c.moveTo(74, 3);
-    c.lineTo(20, -36);
-    c.lineTo(20, -13);
-    c.lineTo(-72, -13);
-    c.lineTo(-72, 17);
-    c.lineTo(20, 17);
-    c.lineTo(20, 42);
-    c.closePath();
-    c.fill();
-    // Main arrow
-    c.fillStyle = '#234876';
-    c.beginPath();
-    c.moveTo(72, 0);
-    c.lineTo(18, -38);
-    c.lineTo(18, -15);
-    c.lineTo(-72, -15);
-    c.lineTo(-72, 15);
-    c.lineTo(18, 15);
-    c.lineTo(18, 38);
-    c.closePath();
-    c.fill();
-    // Top-edge highlight on arrow
-    c.fillStyle = '#5b8dd6';
-    c.beginPath();
-    c.moveTo(64, -3);
-    c.lineTo(18, -32);
-    c.lineTo(18, -12);
-    c.lineTo(-66, -12);
-    c.lineTo(-66, -3);
-    c.closePath();
-    c.fill();
-    c.restore();
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
-    return tex;
+  _getArrowGeometry() {
+    // Cached shared geometry — a chunky road-marking arrow extruded with a soft
+    // bevel for a slight 3D enamel feel, then rotated so it lies flat on the
+    // ground with its tip pointing in +X.
+    if (this._arrowGeom) return this._arrowGeom;
+    const shape = new THREE.Shape();
+    const aLen = 34, headW = 12, headL = 14, shaftW = 6;
+    shape.moveTo(aLen / 2, 0);
+    shape.lineTo(aLen / 2 - headL, headW);
+    shape.lineTo(aLen / 2 - headL, shaftW);
+    shape.lineTo(-aLen / 2, shaftW);
+    shape.lineTo(-aLen / 2, -shaftW);
+    shape.lineTo(aLen / 2 - headL, -shaftW);
+    shape.lineTo(aLen / 2 - headL, -headW);
+    shape.lineTo(aLen / 2, 0);
+    const geom = new THREE.ExtrudeGeometry(shape, {
+      depth: 0.55,
+      bevelEnabled: true,
+      bevelThickness: 0.18,
+      bevelSize: 0.3,
+      bevelSegments: 2,
+      curveSegments: 1,
+    });
+    geom.rotateX(-Math.PI / 2);
+    geom.computeBoundingBox();
+    geom.translate(0, -geom.boundingBox.min.y + 0.05, 0);
+    this._arrowGeom = geom;
+    return geom;
   }
 
-  _signpostInfo(n) {
-    const j = identifyJunction(n.id);
-    if (!j) return null;
-    const active = activeBranch(n.id);
-    if (!active) return null;
-    const branch = active.branch;
-    let stemTan;
-    if (j.stem.from === n.id) stemTan = bezTangent(j.stem, 0);
-    else { const t = bezTangent(j.stem, 1); stemTan = { x: -t.x, y: -t.y }; }
-    let branchTan;
-    if (branch.from === n.id) branchTan = bezTangent(branch, 0);
-    else { const t = bezTangent(branch, 1); branchTan = { x: -t.x, y: -t.y }; }
-    const cross = stemTan.x * branchTan.y - stemTan.y * branchTan.x;
-    return { stemTan, isRight: cross > 0 };
-  }
-
-  _createSignpostMeshes() {
+  _createGroundArrow() {
     this._initSceneryMaterials();
-    const mats = this._sceneryMats;
-    const sg = new THREE.Group();
-    // Pole stands at one END of the sign (along its width Z axis) instead of behind
-    // the face — that way the pole never obscures either side of the panel.
-    const POLE_H = 24;
-    const SIGN_W = 19, SIGN_H = 10, SIGN_T = 0.6, SIGN_Y = 19;
-    const POLE_Z = -(SIGN_W / 2 + 1.2); // slight gap between pole and sign edge
-    // Concrete base under the pole
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.7, 0.6, 14), mats.poleMat);
-    base.position.set(0, 0.3, POLE_Z);
-    base.castShadow = true;
-    sg.add(base);
-    // Vertical pole at the side of the sign
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.65, POLE_H, 10), mats.poleMat);
-    pole.position.set(0, POLE_H / 2, POLE_Z);
-    pole.castShadow = true;
-    sg.add(pole);
-    // Top cap
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 8), mats.poleMat);
-    cap.position.set(0, POLE_H + 0.5, POLE_Z);
-    cap.castShadow = true;
-    sg.add(cap);
-    // Sign body — pole is on the -Z edge, sign extends in +Z from there
-    const body = new THREE.Mesh(new THREE.BoxGeometry(SIGN_T, SIGN_H, SIGN_W), mats.signBlankMat);
-    body.position.set(0, SIGN_Y, 0);
-    body.castShadow = true;
-    body.receiveShadow = true;
-    sg.add(body);
-    // Horizontal brackets reaching from pole to the sign's near edge
-    const bracketLen = -POLE_Z - SIGN_W / 2; // gap between pole center and sign edge
-    for (const yOff of [-3.5, 3.5]) {
-      const bracket = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.45, bracketLen), mats.poleMat);
-      bracket.position.set(0, SIGN_Y + yOff, POLE_Z + bracketLen / 2);
-      bracket.castShadow = true;
-      sg.add(bracket);
-    }
-    // Arrow planes (material updated dynamically each frame)
-    const fp = new THREE.Mesh(new THREE.PlaneGeometry(SIGN_W - 0.8, SIGN_H - 0.8), mats.rightArrowMat);
-    fp.position.set(-(SIGN_T / 2 + 0.02), SIGN_Y, 0);
-    fp.rotation.y = -Math.PI / 2;
-    sg.add(fp);
-    const bp = new THREE.Mesh(new THREE.PlaneGeometry(SIGN_W - 0.8, SIGN_H - 0.8), mats.leftArrowMat);
-    bp.position.set(SIGN_T / 2 + 0.02, SIGN_Y, 0);
-    bp.rotation.y = Math.PI / 2;
-    sg.add(bp);
-    return { group: sg, fp, bp };
+    const mesh = new THREE.Mesh(this._getArrowGeometry(), this._sceneryMats.arrowMat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
   }
 
   syncSignposts() {
-    // Reconcile signposts against current junctions, refresh transforms + arrow textures every frame.
+    // Reconcile junction ground-arrows. The arrow points along the chord from
+    // the node to a point deep inside the currently active branch — that
+    // captures the actual divergence even though real turnouts leave the
+    // junction tangent to the stem.
     const junctionIds = new Set();
     for (const n of nodes.values()) {
       if (getConnectedEdges(n.id).length >= 3) junctionIds.add(n.id);
     }
-    // Remove obsolete
     for (const [nodeId, s] of [...this.signposts]) {
       if (!junctionIds.has(nodeId)) {
-        this.signpostGroup.remove(s.group);
-        s.group.traverse(o => { if (o.isMesh && o.geometry) o.geometry.dispose(); });
+        this.signpostGroup.remove(s.mesh);
         this.signposts.delete(nodeId);
       }
     }
-    // Create new + update existing
-    const mats = this._sceneryMats;
     for (const nodeId of junctionIds) {
       const n = nodes.get(nodeId);
       let s = this.signposts.get(nodeId);
       if (!s) {
-        s = this._createSignpostMeshes();
-        this.signpostGroup.add(s.group);
+        s = { mesh: this._createGroundArrow() };
+        this.signpostGroup.add(s.mesh);
         this.signposts.set(nodeId, s);
       }
-      const info = this._signpostInfo(n);
-      if (!info) continue;
-      const perpX = info.isRight ? info.stemTan.y : -info.stemTan.y;
-      const perpY = info.isRight ? -info.stemTan.x : info.stemTan.x;
-      const offset = 28;
-      s.group.position.set(n.x + perpX * offset, 0, n.y + perpY * offset);
-      s.group.rotation.y = -Math.atan2(info.stemTan.y, info.stemTan.x);
-      // The crucial bit: pick the arrow texture every frame from current switch state
-      s.fp.material = info.isRight ? mats.rightArrowMat : mats.leftArrowMat;
-      s.bp.material = info.isRight ? mats.leftArrowMat : mats.rightArrowMat;
+      const active = activeBranch(nodeId);
+      if (!active) continue;
+      const branch = active.branch;
+      if (!branch._arc) buildArc(branch);
+      const branchAtFrom = branch.from === nodeId;
+      const aimS = Math.min(branch._arc.total * 0.7, 90);
+      const aimParam = branchAtFrom ? aimS : branch._arc.total - aimS;
+      const aimT = tFromS(branch, aimParam);
+      const aimP = bezPoint(branch, aimT);
+      let dx = aimP.x - n.x, dy = aimP.y - n.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 0.5) continue;
+      dx /= dist; dy /= dist;
+      const offset = 24;
+      s.mesh.position.set(n.x + dx * offset, 0, n.y + dy * offset);
+      s.mesh.rotation.y = -Math.atan2(dy, dx);
     }
   }
 
